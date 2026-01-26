@@ -1,0 +1,32 @@
+# Rust
+/target
+**/target
+Cargo.lock.bak
+
+# Node / SDK
+node_modules
+/sdk/dist
+/sdk/coverage
+*.tsbuildinfo
+
+# Anchor / Solana
+.anchor
+test-ledger
+**/*.so
+
+# Environment
+.env
+.env.local
+
+# Editor / OS
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# Tooling (local-only, never published)
+main.py
+generator.py
+builder.py
+__pycache__
+*.pyc
