@@ -1,0 +1,19 @@
+[workspace]
+resolver = "2"
+members = ["crates/gaslt-core"]
+# The on-chain program is built with the Solana toolchain (`cargo build-sbf` /
+# `anchor build`), not the host target, so it is kept out of the default
+# workspace build. See programs/sospeso-verifier.
+exclude = ["programs/sospeso-verifier"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/gaslt-fun/gaslt"
+homepage = "https://gaslt.fun"
+authors = ["gaslt maintainers"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
