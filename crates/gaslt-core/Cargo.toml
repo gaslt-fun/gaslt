@@ -1,0 +1,19 @@
+[package]
+name = "gaslt-core"
+version = "0.4.2"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT"
+description = "Reference implementation of the sospeso gas-abstraction protocol: registry, escrow accounting, claim verification, eligibility, and rate limiting."
+repository = "https://github.com/gaslt-fun/gaslt"
+homepage = "https://gaslt.fun"
+keywords = ["solana", "gas", "sospeso", "relayer", "escrow"]
+categories = ["cryptography::cryptocurrencies", "no-std"]
+
+[dependencies]
+borsh = { version = "1.5", features = ["derive"] }
+thiserror = "1.0"
+
+[lib]
+name = "gaslt_core"
+path = "src/lib.rs"
