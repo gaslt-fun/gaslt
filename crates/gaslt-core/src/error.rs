@@ -60,3 +60,73 @@ pub enum ProtocolError {
     /// A zero or otherwise nonsensical amount was supplied.
     #[error("invalid amount: {0}")]
     InvalidAmount(u64),
+
+    /// A checked arithmetic operation overflowed.
+    #[error("arithmetic overflow")]
+    Overflow,
+}
+
+/// Result alias used throughout the crate.
+pub type Result<T> = core::result::Result<T, ProtocolError>;
+
+impl ProtocolError {
+    /// A short, stable machine code for logs and SDK error mapping.
+    pub fn code(&self) -> &'static str {
+        match self {
+            ProtocolError::InsufficientBudget { .. } => "insufficient_budget",
+            ProtocolError::BelowRentFloor { .. } => "below_rent_floor",
+            ProtocolError::PerClaimCapExceeded { .. } => "per_claim_cap",
+            ProtocolError::ClaimCountExhausted { .. } => "claim_count_exhausted",
+            ProtocolError::Expired { .. } => "expired",
+            ProtocolError::DoubleClaim => "double_claim",
+            ProtocolError::NotNewWallet => "not_new_wallet",
+            ProtocolError::ProgramMismatch { .. } => "program_mismatch",
+            ProtocolError::RateLimited { .. } => "rate_limited",
+            ProtocolError::NotFound(_) => "not_found",
+            ProtocolError::AlreadyExists(_) => "already_exists",
+            ProtocolError::InvalidAmount(_) => "invalid_amount",
+            ProtocolError::Overflow => "overflow",
+        }
+    }
+
+    /// Whether retrying the same request later could succeed (e.g. a rate limit
+    /// window resets) versus a permanent rejection (e.g. a double claim).
+    pub fn is_transient(&self) -> bool {
+        matches!(self, ProtocolError::RateLimited { .. })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codes_are_stable_and_distinct() {
+        let a = ProtocolError::DoubleClaim;
+        let b = ProtocolError::Overflow;
+        assert_eq!(a.code(), "double_claim");
+        assert_ne!(a.code(), b.code());
+    }
+
+    #[test]
+    fn only_rate_limit_is_transient() {
+        assert!(ProtocolError::RateLimited {
+            axis: "wallet",
+            count: 4,
+            limit: 3
+        }
+        .is_transient());
+        assert!(!ProtocolError::DoubleClaim.is_transient());
+    }
+
+    #[test]
+    fn display_includes_numbers() {
+        let e = ProtocolError::InsufficientBudget {
+            needed: 100,
+            remaining: 40,
+        };
+        let text = e.to_string();
+        assert!(text.contains("100"));
+        assert!(text.contains("40"));
+    }
+}
