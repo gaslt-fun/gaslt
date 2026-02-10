@@ -136,3 +136,121 @@ impl SospesoParams {
     /// Mark the pool as new-wallet-only (builder style).
     pub fn new_wallets_only(mut self) -> Self {
         self.new_wallet_only = true;
+        self
+    }
+}
+
+/// A live sospeso: the sponsor's parameters plus mutable accounting state.
+#[derive(Clone, Debug, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
+pub struct Sospeso {
+    /// The fixed parameters set at creation.
+    pub params: SospesoParams,
+    /// Lamports still available to claim.
+    pub lamports_remaining: u64,
+    /// Number of claims served so far.
+    pub claims_count: u32,
+    /// Creation timestamp (unix seconds).
+    pub created_at: i64,
+}
+
+impl Sospeso {
+    /// Open a sospeso from parameters at `created_at`, fully funded.
+    pub fn open(params: SospesoParams, created_at: i64) -> Self {
+        let lamports_remaining = params.lamports_total;
+        Sospeso {
+            params,
+            lamports_remaining,
+            claims_count: 0,
+            created_at,
+        }
+    }
+
+    /// Whether the pool has expired at `now` (expiry 0 means never).
+    pub fn is_expired(&self, now: i64) -> bool {
+        self.params.expiry_ts != 0 && self.params.expiry_ts <= now
+    }
+
+    /// Whether the pool has exhausted its allowed number of claims.
+    pub fn claims_exhausted(&self) -> bool {
+        self.params.max_claims != 0 && self.claims_count >= self.params.max_claims
+    }
+
+    /// Whether the pool can still cover a claim of `amount` lamports right now.
+    pub fn can_cover(&self, amount: u64, now: i64) -> bool {
+        amount > 0
+            && !self.is_expired(now)
+            && !self.claims_exhausted()
+            && self.lamports_remaining >= amount
+            && (self.params.max_per_claim == 0 || amount <= self.params.max_per_claim)
+    }
+
+    /// Fraction of the original budget already spent, in basis points (0-10000).
+    pub fn utilization_bps(&self) -> u32 {
+        let total = self.params.lamports_total;
+        if total == 0 {
+            return 0;
+        }
+        let spent = total.saturating_sub(self.lamports_remaining);
+        ((spent as u128 * 10_000) / total as u128) as u32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pk(seed: u8) -> Pubkey {
+        Pubkey::from_bytes([seed; 32])
+    }
+
+    #[test]
+    fn builder_sets_fields() {
+        let p = SospesoParams::new(pk(1), 1_000)
+            .with_max_per_claim(100)
+            .with_max_claims(5)
+            .with_expiry(42)
+            .new_wallets_only();
+        assert_eq!(p.max_per_claim, 100);
+        assert_eq!(p.max_claims, 5);
+        assert_eq!(p.expiry_ts, 42);
+        assert!(p.new_wallet_only);
+    }
+
+    #[test]
+    fn can_cover_respects_caps_and_expiry() {
+        let s = Sospeso::open(
+            SospesoParams::new(pk(1), 1_000)
+                .with_max_per_claim(300)
+                .with_expiry(100),
+            0,
+        );
+        assert!(s.can_cover(300, 50));
+        assert!(!s.can_cover(301, 50)); // over per-claim cap
+        assert!(!s.can_cover(300, 100)); // expired
+        assert!(!s.can_cover(0, 50)); // zero amount
+    }
+
+    #[test]
+    fn utilization_tracks_spend() {
+        let mut s = Sospeso::open(SospesoParams::new(pk(1), 1_000), 0);
+        assert_eq!(s.utilization_bps(), 0);
+        s.lamports_remaining = 250;
+        assert_eq!(s.utilization_bps(), 7_500);
+    }
+
+    #[test]
+    fn id_derivation_is_deterministic() {
+        let a = SospesoId::derive(&pk(7), 3);
+        let b = SospesoId::derive(&pk(7), 3);
+        assert_eq!(a, b);
+        assert!(a.as_str().starts_with("spo_"));
+    }
+
+    #[test]
+    fn roundtrips_through_borsh() {
+        let s = Sospeso::open(SospesoParams::new(pk(2), 5_000).with_max_claims(9), 11);
+        let bytes = borsh::to_vec(&s).unwrap();
+        let back: Sospeso = borsh::from_slice(&bytes).unwrap();
+        assert_eq!(s, back);
+    }
+}
