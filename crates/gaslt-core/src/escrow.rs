@@ -74,3 +74,56 @@ impl Escrow {
             return Err(ProtocolError::BelowRentFloor {
                 balance: self.balance,
                 floor: self.rent_floor,
+            });
+        }
+        self.balance = post;
+        Ok(self.balance)
+    }
+
+    /// Reclaim everything above the rent floor (sponsor withdrawal after expiry).
+    /// Returns the amount swept; the escrow is left holding exactly the floor.
+    pub fn sweep_claimable(&mut self) -> u64 {
+        let swept = self.claimable();
+        self.balance -= swept;
+        swept
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn claimable_excludes_floor() {
+        let e = Escrow::with_rent_floor(1_000, 200);
+        assert_eq!(e.claimable(), 800);
+        assert!(e.can_debit(800));
+        assert!(!e.can_debit(801));
+    }
+
+    #[test]
+    fn debit_protects_floor() {
+        let mut e = Escrow::with_rent_floor(1_000, 200);
+        assert_eq!(e.debit(500).unwrap(), 500);
+        let err = e.debit(400).unwrap_err();
+        assert!(matches!(err, ProtocolError::BelowRentFloor { .. }));
+        assert_eq!(e.balance(), 500);
+    }
+
+    #[test]
+    fn deposit_and_sweep() {
+        let mut e = Escrow::with_rent_floor(500, 200);
+        e.deposit(300).unwrap();
+        assert_eq!(e.balance(), 800);
+        let swept = e.sweep_claimable();
+        assert_eq!(swept, 600);
+        assert_eq!(e.balance(), 200);
+    }
+
+    #[test]
+    fn zero_amounts_rejected() {
+        let mut e = Escrow::new(1_000_000);
+        assert!(matches!(e.deposit(0), Err(ProtocolError::InvalidAmount(0))));
+        assert!(matches!(e.debit(0), Err(ProtocolError::InvalidAmount(0))));
+    }
+}
