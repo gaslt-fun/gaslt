@@ -87,3 +87,106 @@ pub fn evaluate_claim(
         return Err(ProtocolError::PerClaimCapExceeded {
             requested: request.amount,
             cap,
+        });
+    }
+    if sospeso.lamports_remaining < request.amount {
+        return Err(ProtocolError::InsufficientBudget {
+            needed: request.amount,
+            remaining: sospeso.lamports_remaining,
+        });
+    }
+    Ok(ClaimReceipt::new(request.beneficiary, request.amount, now))
+}
+
+/// Apply a validated receipt to a pool, debiting it and bumping the counter.
+///
+/// Returns the pool's remaining lamports after the debit. This is the only
+/// function in the module that mutates, and it assumes [`evaluate_claim`] has
+/// already accepted the request (it still guards against underflow).
+pub fn apply_claim(sospeso: &mut Sospeso, receipt: &ClaimReceipt) -> Result<u64> {
+    sospeso.lamports_remaining = sospeso
+        .lamports_remaining
+        .checked_sub(receipt.amount)
+        .ok_or(ProtocolError::Overflow)?;
+    sospeso.claims_count = sospeso
+        .claims_count
+        .checked_add(1)
+        .ok_or(ProtocolError::Overflow)?;
+    Ok(sospeso.lamports_remaining)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::SospesoParams;
+
+    fn pool() -> Sospeso {
+        Sospeso::open(
+            SospesoParams::new(Pubkey::from_bytes([1; 32]), 1_000)
+                .with_max_per_claim(300)
+                .with_max_claims(3)
+                .with_expiry(1_000),
+            0,
+        )
+    }
+
+    fn req(amount: u64) -> ClaimRequest {
+        ClaimRequest::new(Pubkey::from_bytes([2; 32]), amount)
+    }
+
+    #[test]
+    fn happy_path_and_apply() {
+        let mut p = pool();
+        let receipt = evaluate_claim(&p, &req(250), 10, false).unwrap();
+        let remaining = apply_claim(&mut p, &receipt).unwrap();
+        assert_eq!(remaining, 750);
+        assert_eq!(p.claims_count, 1);
+    }
+
+    #[test]
+    fn double_claim_blocked() {
+        let p = pool();
+        assert!(matches!(
+            evaluate_claim(&p, &req(100), 10, true),
+            Err(ProtocolError::DoubleClaim)
+        ));
+    }
+
+    #[test]
+    fn per_claim_cap_enforced() {
+        let p = pool();
+        assert!(matches!(
+            evaluate_claim(&p, &req(301), 10, false),
+            Err(ProtocolError::PerClaimCapExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn expiry_enforced() {
+        let p = pool();
+        assert!(matches!(
+            evaluate_claim(&p, &req(100), 1_000, false),
+            Err(ProtocolError::Expired { .. })
+        ));
+    }
+
+    #[test]
+    fn count_exhaustion_enforced() {
+        let mut p = pool();
+        p.claims_count = 3;
+        assert!(matches!(
+            evaluate_claim(&p, &req(100), 10, false),
+            Err(ProtocolError::ClaimCountExhausted { .. })
+        ));
+    }
+
+    #[test]
+    fn budget_shortfall_enforced() {
+        let mut p = pool();
+        p.lamports_remaining = 50;
+        assert!(matches!(
+            evaluate_claim(&p, &req(100), 10, false),
+            Err(ProtocolError::InsufficientBudget { .. })
+        ));
+    }
+}
