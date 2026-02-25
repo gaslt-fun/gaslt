@@ -87,3 +87,96 @@ pub fn check_eligibility(
     // Program restriction: a default (zero) pool program matches anything.
     if !sospeso.params.program.is_default() && &sospeso.params.program != program {
         return Err(ProtocolError::ProgramMismatch {
+            pool: sospeso.params.program.short(),
+            requested: program.short(),
+        });
+    }
+    if sospeso.params.new_wallet_only && !policy.is_new_wallet(profile) {
+        return Err(ProtocolError::NotNewWallet);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::SospesoParams;
+
+    fn sponsor() -> Pubkey {
+        Pubkey::from_bytes([1; 32])
+    }
+    fn bene() -> Pubkey {
+        Pubkey::from_bytes([2; 32])
+    }
+
+    #[test]
+    fn new_wallet_threshold() {
+        let policy = EligibilityPolicy::default();
+        assert!(policy.is_new_wallet(&WalletProfile::verified(0)));
+        assert!(policy.is_new_wallet(&WalletProfile::verified(5)));
+        assert!(!policy.is_new_wallet(&WalletProfile::verified(6)));
+    }
+
+    #[test]
+    fn unverified_fails_closed_by_default() {
+        let policy = EligibilityPolicy::default();
+        assert!(!policy.is_new_wallet(&WalletProfile::unverified()));
+    }
+
+    #[test]
+    fn new_wallet_only_pool_rejects_active_wallet() {
+        let pool = Sospeso::open(SospesoParams::new(sponsor(), 1_000).new_wallets_only(), 0);
+        let err = check_eligibility(
+            &pool,
+            &bene(),
+            &WalletProfile::verified(50),
+            &Pubkey::default_key(),
+            10,
+            &EligibilityPolicy::default(),
+        )
+        .unwrap_err();
+        assert!(matches!(err, ProtocolError::NotNewWallet));
+    }
+
+    #[test]
+    fn program_restriction() {
+        let target = Pubkey::from_bytes([7; 32]);
+        let pool = Sospeso::open(SospesoParams::new(sponsor(), 1_000).for_program(target), 0);
+        // Wrong program -> mismatch.
+        assert!(matches!(
+            check_eligibility(
+                &pool,
+                &bene(),
+                &WalletProfile::verified(0),
+                &Pubkey::from_bytes([8; 32]),
+                10,
+                &EligibilityPolicy::default()
+            ),
+            Err(ProtocolError::ProgramMismatch { .. })
+        ));
+        // Right program -> ok.
+        assert!(check_eligibility(
+            &pool,
+            &bene(),
+            &WalletProfile::verified(0),
+            &target,
+            10,
+            &EligibilityPolicy::default()
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn sponsor_cannot_claim_own_pool() {
+        let pool = Sospeso::open(SospesoParams::new(sponsor(), 1_000), 0);
+        assert!(check_eligibility(
+            &pool,
+            &sponsor(),
+            &WalletProfile::verified(0),
+            &Pubkey::default_key(),
+            10,
+            &EligibilityPolicy::default()
+        )
+        .is_err());
+    }
+}
