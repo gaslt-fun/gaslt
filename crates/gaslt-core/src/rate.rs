@@ -98,3 +98,100 @@ impl RateLimiter {
             entry.bucket = bucket;
             entry.count = 0;
         }
+        if entry.count >= rule.limit {
+            return RateDecision {
+                allowed: false,
+                count: entry.count,
+                axis: rule.axis,
+            };
+        }
+        entry.count += 1;
+        RateDecision {
+            allowed: true,
+            count: entry.count,
+            axis: rule.axis,
+        }
+    }
+
+    /// Like [`check`], but returns a [`ProtocolError::RateLimited`] when blocked.
+    pub fn enforce(&mut self, key: &str, rule: &RateRule, now_ms: u64) -> Result<u32> {
+        let decision = self.check(key, rule, now_ms);
+        if decision.allowed {
+            Ok(decision.count)
+        } else {
+            Err(ProtocolError::RateLimited {
+                axis: rule.axis,
+                count: decision.count,
+                limit: rule.limit,
+            })
+        }
+    }
+
+    /// Drop counters whose window is older than `now_ms`, freeing memory.
+    pub fn sweep(&mut self, now_ms: u64, rule: &RateRule) {
+        let current = rule.bucket(now_ms);
+        self.counters.retain(|_, c| c.bucket >= current);
+    }
+
+    /// Forget a single key (e.g. after a manual reset).
+    pub fn reset(&mut self, key: &str) {
+        self.counters.remove(key);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const RULE: RateRule = RateRule::new("wallet", 3, 60_000);
+
+    #[test]
+    fn allows_up_to_limit_then_blocks() {
+        let mut rl = RateLimiter::new();
+        for i in 1..=3 {
+            let d = rl.check("w", &RULE, 0);
+            assert!(d.allowed);
+            assert_eq!(d.count, i);
+        }
+        let d = rl.check("w", &RULE, 0);
+        assert!(!d.allowed);
+        assert_eq!(d.count, 3);
+    }
+
+    #[test]
+    fn window_rollover_resets() {
+        let mut rl = RateLimiter::new();
+        for _ in 0..3 {
+            rl.check("w", &RULE, 0);
+        }
+        assert!(!rl.check("w", &RULE, 30_000).allowed); // same window
+        assert!(rl.check("w", &RULE, 60_000).allowed); // next window
+    }
+
+    #[test]
+    fn enforce_maps_to_error() {
+        let mut rl = RateLimiter::new();
+        for _ in 0..3 {
+            rl.enforce("w", &RULE, 0).unwrap();
+        }
+        let err = rl.enforce("w", &RULE, 0).unwrap_err();
+        assert!(matches!(err, ProtocolError::RateLimited { axis: "wallet", .. }));
+    }
+
+    #[test]
+    fn peek_does_not_increment() {
+        let mut rl = RateLimiter::new();
+        rl.check("w", &RULE, 0);
+        assert_eq!(rl.peek("w", &RULE, 0), 1);
+        assert_eq!(rl.peek("w", &RULE, 0), 1);
+    }
+
+    #[test]
+    fn sweep_drops_stale_windows() {
+        let mut rl = RateLimiter::new();
+        rl.check("w", &RULE, 0);
+        assert_eq!(rl.tracked_keys(), 1);
+        rl.sweep(120_000, &RULE);
+        assert_eq!(rl.tracked_keys(), 0);
+    }
+}
