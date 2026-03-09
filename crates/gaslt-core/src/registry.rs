@@ -98,3 +98,113 @@ impl Registry {
         let pool = self
             .pools
             .get_mut(id)
+            .ok_or_else(|| ProtocolError::NotFound(id.to_string()))?;
+
+        let receipt = evaluate_claim(pool, &request, now, already)?;
+        apply_claim(pool, &receipt)?;
+
+        self.claimed_pairs
+            .insert((id.clone(), request.beneficiary));
+        self.receipts.push((id.clone(), receipt.clone()));
+        Ok(receipt)
+    }
+
+    /// Count receipts for a beneficiary at or after `since` (unix seconds).
+    pub fn count_claims_for_wallet(&self, beneficiary: &Pubkey, since: i64) -> usize {
+        self.receipts
+            .iter()
+            .filter(|(_, r)| &r.beneficiary == beneficiary && r.ts >= since)
+            .count()
+    }
+
+    /// All receipts recorded against a given pool.
+    pub fn receipts_for(&self, id: &SospesoId) -> Vec<&ClaimReceipt> {
+        self.receipts
+            .iter()
+            .filter(|(pid, _)| pid == id)
+            .map(|(_, r)| r)
+            .collect()
+    }
+
+    /// Compute aggregate stats.
+    pub fn stats(&self) -> RegistryStats {
+        let total_lamports_drawn = self.receipts.iter().map(|(_, r)| r.amount).sum();
+        RegistryStats {
+            total_sospesos: self.pools.len(),
+            total_claims: self.receipts.len(),
+            total_lamports_drawn,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::SospesoParams;
+
+    fn pk(s: u8) -> Pubkey {
+        Pubkey::from_bytes([s; 32])
+    }
+
+    fn registry_with_pool() -> (Registry, SospesoId) {
+        let mut r = Registry::new();
+        let id = r.insert(Sospeso::open(
+            SospesoParams::new(pk(1), 1_000).with_max_per_claim(300),
+            0,
+        ));
+        (r, id)
+    }
+
+    #[test]
+    fn insert_and_get() {
+        let (r, id) = registry_with_pool();
+        assert_eq!(r.len(), 1);
+        assert_eq!(r.get(&id).unwrap().lamports_remaining, 1_000);
+    }
+
+    #[test]
+    fn claim_debits_and_guards_double() {
+        let (mut r, id) = registry_with_pool();
+        let receipt = r.claim(&id, ClaimRequest::new(pk(2), 250), 10).unwrap();
+        assert_eq!(receipt.amount, 250);
+        assert_eq!(r.get(&id).unwrap().lamports_remaining, 750);
+        // Second claim by the same wallet is rejected.
+        assert!(matches!(
+            r.claim(&id, ClaimRequest::new(pk(2), 100), 11),
+            Err(ProtocolError::DoubleClaim)
+        ));
+    }
+
+    #[test]
+    fn stats_aggregate() {
+        let (mut r, id) = registry_with_pool();
+        r.claim(&id, ClaimRequest::new(pk(2), 100), 10).unwrap();
+        r.claim(&id, ClaimRequest::new(pk(3), 150), 10).unwrap();
+        let s = r.stats();
+        assert_eq!(s.total_claims, 2);
+        assert_eq!(s.total_lamports_drawn, 250);
+        assert_eq!(s.total_sospesos, 1);
+    }
+
+    #[test]
+    fn unknown_pool_is_not_found() {
+        let mut r = Registry::new();
+        let missing = SospesoId::new("nope");
+        assert!(matches!(
+            r.claim(&missing, ClaimRequest::new(pk(2), 10), 0),
+            Err(ProtocolError::NotFound(_))
+        ));
+    }
+
+    #[test]
+    fn explicit_id_collision() {
+        let mut r = Registry::new();
+        let id = SospesoId::new("fixed");
+        r.insert_with_id(id.clone(), Sospeso::open(SospesoParams::new(pk(1), 1), 0))
+            .unwrap();
+        assert!(matches!(
+            r.insert_with_id(id, Sospeso::open(SospesoParams::new(pk(1), 1), 0)),
+            Err(ProtocolError::AlreadyExists(_))
+        ));
+    }
+}
