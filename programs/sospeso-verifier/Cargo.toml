@@ -1,0 +1,22 @@
+[package]
+name = "sospeso-verifier"
+version = "0.4.2"
+edition = "2021"
+license = "MIT"
+description = "On-chain Anchor program for the sospeso gas-abstraction protocol: escrow, claim accounting, and on-chain anti-abuse."
+repository = "https://github.com/gaslt-fun/gaslt"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "sospeso_verifier"
+
+[features]
+default = []
+cpi = ["no-entrypoint"]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = "0.30.1"
