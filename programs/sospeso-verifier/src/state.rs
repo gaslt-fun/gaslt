@@ -35,3 +35,39 @@ pub struct Sospeso {
     /// Reserved padding for forward-compatible upgrades.
     pub _padding: [u8; 6],
 }
+
+impl Sospeso {
+    /// Seed prefix for the pool PDA.
+    pub const SEED: &'static [u8] = b"sospeso";
+
+    /// Whether the pool has expired at `now`.
+    pub fn is_expired(&self, now: i64) -> bool {
+        self.expiry_ts != 0 && self.expiry_ts <= now
+    }
+
+    /// Whether the pool has exhausted its allowed number of claims.
+    pub fn claims_exhausted(&self) -> bool {
+        self.max_claims != 0 && self.claims_count >= self.max_claims
+    }
+}
+
+/// Proof that a beneficiary has claimed from a given pool. Its existence is the
+/// double-claim guard: a second `claim_sospeso` for the same pair fails at
+/// account initialization.
+#[account]
+#[derive(InitSpace)]
+pub struct ClaimReceipt {
+    /// Wallet credited by the claim.
+    pub beneficiary: Pubkey,
+    /// Lamports drawn.
+    pub amount: u64,
+    /// Timestamp the claim was served.
+    pub ts: i64,
+    /// PDA bump.
+    pub bump: u8,
+}
+
+impl ClaimReceipt {
+    /// Seed prefix for the receipt PDA.
+    pub const SEED: &'static [u8] = b"claim";
+}
