@@ -114,3 +114,139 @@ pub mod sospeso_verifier {
             .lamports_remaining
             .checked_sub(amount)
             .ok_or(SospesoError::Overflow)?;
+        pool.claims_count = pool
+            .claims_count
+            .checked_add(1)
+            .ok_or(SospesoError::Overflow)?;
+
+        let receipt = &mut ctx.accounts.receipt;
+        receipt.beneficiary = ctx.accounts.beneficiary.key();
+        receipt.amount = amount;
+        receipt.ts = now;
+        receipt.bump = ctx.bumps.receipt;
+
+        emit!(SospesoClaimed {
+            sospeso: pool.key(),
+            beneficiary: receipt.beneficiary,
+            amount,
+        });
+        Ok(())
+    }
+
+    /// Add `amount` lamports to an existing pool (sponsor only).
+    pub fn top_up(ctx: Context<TopUp>, amount: u64) -> Result<()> {
+        require!(amount > 0, SospesoError::InvalidAmount);
+
+        let cpi = anchor_lang::system_program::Transfer {
+            from: ctx.accounts.sponsor.to_account_info(),
+            to: ctx.accounts.sospeso.to_account_info(),
+        };
+        anchor_lang::system_program::transfer(
+            CpiContext::new(ctx.accounts.system_program.to_account_info(), cpi),
+            amount,
+        )?;
+
+        let pool = &mut ctx.accounts.sospeso;
+        pool.lamports_total = pool
+            .lamports_total
+            .checked_add(amount)
+            .ok_or(SospesoError::Overflow)?;
+        pool.lamports_remaining = pool
+            .lamports_remaining
+            .checked_add(amount)
+            .ok_or(SospesoError::Overflow)?;
+        Ok(())
+    }
+
+    /// After expiry, sweep the remaining claimable lamports back to the sponsor
+    /// and close the pool account.
+    pub fn reclaim(ctx: Context<Reclaim>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let pool = &ctx.accounts.sospeso;
+        require!(pool.is_expired(now), SospesoError::NotExpired);
+        // The `close = sponsor` constraint returns all lamports (including rent)
+        // to the sponsor; nothing else to do here.
+        emit!(SospesoReclaimed {
+            sospeso: pool.key(),
+            sponsor: ctx.accounts.sponsor.key(),
+        });
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(nonce: u64)]
+pub struct CreateSospeso<'info> {
+    #[account(mut)]
+    pub sponsor: Signer<'info>,
+    /// CHECK: only the key is read, to bind the pool to a target program.
+    pub target_program: UncheckedAccount<'info>,
+    #[account(
+        init,
+        payer = sponsor,
+        space = 8 + Sospeso::INIT_SPACE,
+        seeds = [Sospeso::SEED, sponsor.key().as_ref(), &nonce.to_le_bytes()],
+        bump,
+    )]
+    pub sospeso: Account<'info, Sospeso>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimSospeso<'info> {
+    /// Pays for the receipt rent. May be the beneficiary or a relayer.
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: credited with the claimed lamports; not required to sign so a
+    /// relayer can claim on its behalf. Bound into the receipt seeds.
+    #[account(mut)]
+    pub beneficiary: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub sospeso: Account<'info, Sospeso>,
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + ClaimReceipt::INIT_SPACE,
+        seeds = [ClaimReceipt::SEED, sospeso.key().as_ref(), beneficiary.key().as_ref()],
+        bump,
+    )]
+    pub receipt: Account<'info, ClaimReceipt>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct TopUp<'info> {
+    #[account(mut, address = sospeso.sponsor @ SospesoError::NotSponsor)]
+    pub sponsor: Signer<'info>,
+    #[account(mut)]
+    pub sospeso: Account<'info, Sospeso>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct Reclaim<'info> {
+    #[account(mut, address = sospeso.sponsor @ SospesoError::NotSponsor)]
+    pub sponsor: Signer<'info>,
+    #[account(mut, close = sponsor)]
+    pub sospeso: Account<'info, Sospeso>,
+}
+
+#[event]
+pub struct SospesoCreated {
+    pub sospeso: Pubkey,
+    pub sponsor: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SospesoClaimed {
+    pub sospeso: Pubkey,
+    pub beneficiary: Pubkey,
+    pub amount: u64,
+}
+
+#[event]
+pub struct SospesoReclaimed {
+    pub sospeso: Pubkey,
+    pub sponsor: Pubkey,
+}
