@@ -34,3 +34,44 @@ export function canCover(
 
 /** Full eligibility: budget plus new-wallet and program gating. */
 export function isEligible(
+  pool: Sospeso,
+  criteria: MatchCriteria,
+  nowUnix: number,
+): boolean {
+  if (!canCover(pool, criteria.neededLamports, nowUnix)) return false;
+  if (pool.sponsor === criteria.beneficiary) return false;
+  if (
+    criteria.programId &&
+    pool.programId !== "" &&
+    pool.programId !== criteria.programId
+  ) {
+    return false;
+  }
+  if (pool.newWalletOnly && !criteria.isNewWallet) return false;
+  return true;
+}
+
+/** Pick the best eligible pool from a list, or null when nothing fits. */
+export function selectBestPool(
+  pools: Sospeso[],
+  criteria: MatchCriteria,
+  nowUnix: number,
+): Sospeso | null {
+  const expiryKey = (p: Sospeso) =>
+    p.expiryTs === 0 ? Number.MAX_SAFE_INTEGER : p.expiryTs;
+
+  let best: Sospeso | null = null;
+  for (const pool of pools) {
+    if (!isEligible(pool, criteria, nowUnix)) continue;
+    if (best === null) {
+      best = pool;
+      continue;
+    }
+    if (pool.lamportsRemaining !== best.lamportsRemaining) {
+      if (pool.lamportsRemaining < best.lamportsRemaining) best = pool;
+    } else if (expiryKey(pool) < expiryKey(best)) {
+      best = pool;
+    }
+  }
+  return best;
+}
