@@ -109,3 +109,105 @@ let mut registry = Registry::new();
 
 // A sponsor opens a new-wallet-only onboarding pool.
 let sponsor = Pubkey::from_bytes([1u8; 32]);
+let id = registry.insert(Sospeso::open(
+    SospesoParams::new(sponsor, 2_000_000)
+        .with_max_per_claim(50_000)
+        .with_max_claims(40)
+        .new_wallets_only(),
+    0,
+));
+
+// A brand-new wallet is matched and claims its first gas.
+let newbie = Pubkey::from_bytes([42u8; 32]);
+let matcher = Matcher::default();
+let outcome = matcher
+    .find(&registry, &MatchCriteria::new(newbie, 40_000), &WalletProfile::verified(0), 10)
+    .expect("a new wallet matches the onboarding pool");
+
+let receipt = registry
+    .claim(&outcome.id, ClaimRequest::new(newbie, 40_000), 11)
+    .unwrap();
+assert_eq!(receipt.amount, 40_000);
+```
+
+Query pools and pick a match from a client with the SDK:
+
+```ts
+import { GasltClient, selectBestPool } from "@gaslt/sdk";
+
+const client = new GasltClient({ baseUrl: "https://gaslt.fun/api" });
+const pools = await client.listSospesos();
+
+const match = selectBestPool(
+  pools,
+  { beneficiary: wallet, neededLamports: 40_000, isNewWallet: true },
+  Math.floor(Date.now() / 1000),
+);
+
+if (match) {
+  const result = await client.sponsor({ transactionBase64, beneficiary: wallet, sospesoId: match.id });
+  console.log(result.signature);
+}
+```
+
+## On-chain program
+
+The `sospeso_verifier` Anchor program holds escrow and enforces the accounting.
+
+| Instruction | What it does |
+|-------------|--------------|
+| `create_sospeso` | Move lamports from the sponsor into a new pool PDA. |
+| `claim_sospeso` | Draw lamports for a beneficiary and write a `ClaimReceipt`. |
+| `top_up` | Sponsor adds lamports to an existing pool. |
+| `reclaim` | After expiry, sweep the remainder back to the sponsor. |
+
+Two PDAs anchor the design:
+
+- **`Sospeso`** -- seeds `["sospeso", sponsor, nonce]` -- the escrow and its
+  accounting state.
+- **`ClaimReceipt`** -- seeds `["claim", sospeso, beneficiary]` -- whose
+  existence is the double-claim guard.
+
+## Building and testing
+
+```bash
+# Rust core (host toolchain)
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --all -- --check
+
+# TypeScript SDK
+cd sdk && npm ci && npm run build && npm test
+
+# On-chain program (Solana toolchain)
+anchor build
+anchor test
+```
+
+Install from source:
+
+```bash
+git clone https://github.com/gaslt-fun/gaslt.git
+cd gaslt
+cargo build --release
+```
+
+## Protocol invariants
+
+- A pool's escrow never drops below its rent-exempt floor.
+- A beneficiary holds at most one receipt per pool.
+- A claim never exceeds the per-claim cap or the remaining budget.
+- An expired pool serves no further claims; only the sponsor may reclaim it.
+
+The full rule set, including the anti-abuse layers, is described in
+[`docs/protocol.md`](./docs/protocol.md).
+
+## Links
+
+- Site: https://gaslt.fun
+- Docs: [protocol](./docs/protocol.md) and [architecture](./docs/architecture.md)
+- X: https://x.com/gasltbar
+
+## License
+
+Released under the [MIT License](./LICENSE).
