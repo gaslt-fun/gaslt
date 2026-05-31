@@ -7,10 +7,12 @@ FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /build
 COPY pom.xml ./
 COPY core/pom.xml core/pom.xml
+COPY cli/pom.xml cli/pom.xml
 COPY service/pom.xml service/pom.xml
 # Warm the dependency cache for the service and its core dependency.
 RUN mvn -q -B -ntp -pl core,service dependency:go-offline || true
 COPY core core
+COPY cli cli
 COPY service service
 RUN mvn -q -B -ntp -pl service -am -DskipTests package
 
