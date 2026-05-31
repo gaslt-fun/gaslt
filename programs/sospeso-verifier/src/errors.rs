@@ -1,26 +1,46 @@
-//! Program error codes. These mirror `gaslt_core::ProtocolError` so the relayer
-//! can pre-check off-chain and predict the exact on-chain rejection.
+//! Custom error codes for sospeso_verifier.
 
 use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum SospesoError {
-    #[msg("requested amount is zero or invalid")]
-    InvalidAmount,
-    #[msg("pool does not have enough remaining lamports")]
-    InsufficientBudget,
-    #[msg("debit would push the escrow below its rent-exempt floor")]
-    BelowRentFloor,
-    #[msg("requested amount exceeds the per-claim cap")]
-    PerClaimCapExceeded,
-    #[msg("the pool has served its maximum number of claims")]
-    ClaimCountExhausted,
-    #[msg("the sospeso has expired")]
+    #[msg("The sospeso pool has expired")]
     Expired,
-    #[msg("the sospeso has not yet expired")]
-    NotExpired,
-    #[msg("the signer is not the pool sponsor")]
-    NotSponsor,
-    #[msg("arithmetic overflow")]
+    #[msg("The pool has reached its maximum number of claims")]
+    ClaimCapReached,
+    #[msg("Not enough lamports remaining in the pool")]
+    InsufficientFunds,
+    #[msg("Requested amount exceeds the per-claim cap (or the initial deposit)")]
+    AmountTooLarge,
+    #[msg("The pool has not expired yet; reclaim is unavailable")]
+    NotExpiredYet,
+    #[msg("Signer is not authorized for this sospeso")]
+    Unauthorized,
+    #[msg("Amount must be greater than zero")]
+    ZeroAmount,
+    #[msg("max_claims must be greater than zero")]
+    ZeroMaxClaims,
+    #[msg("max_per_claim must be greater than zero")]
+    ZeroMaxPerClaim,
+    #[msg("Arithmetic overflow")]
     Overflow,
+    // --- v0.1.2 additions ---
+    #[msg("The label is empty")]
+    LabelEmpty,
+    #[msg("The label exceeds the maximum length")]
+    LabelTooLong,
+    #[msg("The description exceeds the maximum length")]
+    DescriptionTooLong,
+    #[msg("The URI exceeds the maximum length")]
+    UriTooLong,
+    #[msg("The category value is out of range")]
+    InvalidCategory,
+    #[msg("The new expiry must be in the future")]
+    ExpiryNotInFuture,
+    #[msg("The new expiry must be later than the current expiry")]
+    ExpiryNotExtended,
+    #[msg("The provided sospeso does not match this record")]
+    SospesoMismatch,
+    #[msg("The provided registry does not match this entry")]
+    RegistryMismatch,
 }
