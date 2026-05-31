@@ -57,26 +57,36 @@ sospeso_verifier program
   lamports   : 1141440
 ```
 
-### Read the registry and a bridge (live)
+### Read a bridge (live)
 
-The registry and bridges are program v0.1.3 features. When an account has not been
-created on chain yet, the tool says so plainly and still prints the derived PDA:
+Bridges are a program v0.1.3 feature: an authority registers an off-chain service
+at `["bridge", authority]`. This `jvm` bridge is registered on mainnet and points
+at the very service in this toolkit:
+
+```text
+$ java -jar cli/target/gaslt-cli.jar bridge 9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum
+bridge for authority 9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum
+  bridge PDA : B4smUxyDeW6ptTS6Sd5GsnRD2Pxm2acps5Fqo6HTmEsj  (seeds ["bridge", authority])
+  kind       : jvm
+  endpoint   : https://gaslt-jvm.up.railway.app
+  label      : gaslt-java
+  enabled    : true
+  registered : 1780250718
+  updated    : 1780250718
+```
+
+When an account does not exist on chain yet, the tool says so plainly and still
+prints the derived PDA — for example `registry` before `init_registry` has run:
 
 ```text
 $ java -jar cli/target/gaslt-cli.jar registry
 bar registry
   registry PDA : 6s2rvrg8ytn3mRJJGX6cgZfgDGMMeokC9cD7pJ4v82bm  (seeds ["registry"])
   status       : NOT INITIALISED on https://api.mainnet-beta.solana.com
-
-$ java -jar cli/target/gaslt-cli.jar bridge So11111111111111111111111111111111111111112
-bridge for authority So11111111111111111111111111111111111111112
-  bridge PDA : FcE9VbfBV1E91D9iyxtuEZbVrtu2KbJAkquJByqheypH  (seeds ["bridge", authority])
-  status     : NOT REGISTERED on https://api.mainnet-beta.solana.com
 ```
 
-Once a pool, registry, or bridge is created, the same commands print the decoded
-fields (`pool` shows sponsor, lamports total/remaining, claim counts, expiry, and
-utilisation; `bridge` shows kind/endpoint/label/enabled).
+The `pool` command prints sponsor, lamports total/remaining, claim counts, expiry,
+and utilisation for any pool PDA.
 
 ## License
 

@@ -51,24 +51,19 @@ gaslt-service listening on :8771
 $ curl -s localhost:8771/health
 {"status":"ok","service":"gaslt-service","version":"0.1.3","program":"44gAuvd36LqRNNMqDMCvmoJFNm3eoEGGyaHWeyBeQMPW","rpc":"https://api.mainnet-beta.solana.com"}
 
+$ curl -s localhost:8771/bridge/9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum
+{"authority":"9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum","bridgePda":"B4smUxyDeW6ptTS6Sd5GsnRD2Pxm2acps5Fqo6HTmEsj","kind":"jvm","endpoint":"https://gaslt-jvm.up.railway.app","label":"gaslt-java","enabled":true,"registeredAt":1780250718,"updatedAt":1780250718}
+
 $ curl -s localhost:8771/registry
 {"error":"registry_not_initialised","registryPda":"6s2rvrg8ytn3mRJJGX6cgZfgDGMMeokC9cD7pJ4v82bm"}
-
-$ curl -s localhost:8771/bridge/So11111111111111111111111111111111111111112
-{"error":"bridge_not_registered","authority":"So11111111111111111111111111111111111111112","bridgePda":"FcE9VbfBV1E91D9iyxtuEZbVrtu2KbJAkquJByqheypH"}
-
-$ curl -s localhost:8771/pool/DmQXnkV9VeVHb2YCq2ZpvZUkSsqz4p2MDq2Heko8qvmg
-{"error":"pool_not_found","address":"DmQXnkV9VeVHb2YCq2ZpvZUkSsqz4p2MDq2Heko8qvmg"}
 
 $ curl -s -w ' [%{http_code}]' localhost:8771/nope
 {"error":"not_found","path":"/nope"} [404]
 ```
 
-The registry and bridges are program v0.1.3 features; until they are created on
-chain the service returns the honest `404` shapes above (always including the
-derived PDA). Once a pool or bridge exists, the same routes return the decoded
-fields — for `/bridge`, the `kind`, `endpoint`, `label`, and `enabled` flag a
-JVM service like this one advertises on chain.
+The `jvm` bridge above is registered on mainnet and points at exactly this kind of
+service. When an account does not exist on chain yet (the registry here), the
+service returns the honest `404` shape with the derived PDA included.
 
 ## License
 

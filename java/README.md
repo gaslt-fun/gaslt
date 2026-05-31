@@ -41,6 +41,20 @@ sospeso_verifier program
 ```
 
 ```text
+$ java -jar cli/target/gaslt-cli.jar bridge 9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum
+bridge for authority 9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum
+  bridge PDA : B4smUxyDeW6ptTS6Sd5GsnRD2Pxm2acps5Fqo6HTmEsj  (seeds ["bridge", authority])
+  kind       : jvm
+  endpoint   : https://gaslt-jvm.up.railway.app
+  label      : gaslt-java
+  enabled    : true
+```
+
+That `jvm` bridge is registered on mainnet by the program and points back at this
+toolkit's own service — the SDK decodes it straight from the chain. The service
+exposes the same data as JSON:
+
+```text
 $ curl -s localhost:8080/health
 {"status":"ok","service":"gaslt-service","version":"0.1.3","program":"44gAuvd36LqRNNMqDMCvmoJFNm3eoEGGyaHWeyBeQMPW","rpc":"https://api.mainnet-beta.solana.com"}
 ```
