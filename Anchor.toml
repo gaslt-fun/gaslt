@@ -6,10 +6,10 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-sospeso_verifier = "CKepu1fT4aCkDrsWLv499WCVMb5KKVfG5a1znjC5yuYA"
+sospeso_verifier = "44gAuvd36LqRNNMqDMCvmoJFNm3eoEGGyaHWeyBeQMPW"
 
 [programs.devnet]
-sospeso_verifier = "CKepu1fT4aCkDrsWLv499WCVMb5KKVfG5a1znjC5yuYA"
+sospeso_verifier = "44gAuvd36LqRNNMqDMCvmoJFNm3eoEGGyaHWeyBeQMPW"
 
 [registry]
 url = "https://api.apr.dev"
