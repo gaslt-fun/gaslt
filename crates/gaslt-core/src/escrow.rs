@@ -26,7 +26,10 @@ impl Escrow {
 
     /// Create an escrow with an explicit rent floor.
     pub fn with_rent_floor(balance: u64, rent_floor: u64) -> Self {
-        Escrow { balance, rent_floor }
+        Escrow {
+            balance,
+            rent_floor,
+        }
     }
 
     /// Current total balance (including the protected floor).

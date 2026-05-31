@@ -83,8 +83,7 @@ impl Registry {
 
     /// Whether `beneficiary` already holds a receipt against `id`.
     pub fn has_claimed(&self, id: &SospesoId, beneficiary: &Pubkey) -> bool {
-        self.claimed_pairs
-            .contains(&(id.clone(), *beneficiary))
+        self.claimed_pairs.contains(&(id.clone(), *beneficiary))
     }
 
     /// Validate and record a claim, debiting the pool. Returns the receipt.
@@ -103,8 +102,7 @@ impl Registry {
         let receipt = evaluate_claim(pool, &request, now, already)?;
         apply_claim(pool, &receipt)?;
 
-        self.claimed_pairs
-            .insert((id.clone(), request.beneficiary));
+        self.claimed_pairs.insert((id.clone(), request.beneficiary));
         self.receipts.push((id.clone(), receipt.clone()));
         Ok(receipt)
     }

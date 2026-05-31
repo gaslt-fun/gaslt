@@ -7,9 +7,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 
 /// A 32-byte account address (an ed25519 public key on Solana).
-#[derive(
-    Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, BorshSerialize, BorshDeserialize,
-)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, BorshSerialize, BorshDeserialize)]
 pub struct Pubkey([u8; 32]);
 
 impl Pubkey {
@@ -36,10 +34,7 @@ impl Pubkey {
     /// A short, log-friendly hex fragment such as `0102..1f20`.
     pub fn short(&self) -> String {
         let b = &self.0;
-        format!(
-            "{:02x}{:02x}..{:02x}{:02x}",
-            b[0], b[1], b[30], b[31]
-        )
+        format!("{:02x}{:02x}..{:02x}{:02x}", b[0], b[1], b[30], b[31])
     }
 }
 

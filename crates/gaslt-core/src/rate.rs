@@ -90,10 +90,10 @@ impl RateLimiter {
     /// does not consume budget beyond the one that tripped the limit.
     pub fn check(&mut self, key: &str, rule: &RateRule, now_ms: u64) -> RateDecision {
         let bucket = rule.bucket(now_ms);
-        let entry = self.counters.entry(key.to_string()).or_insert(Counter {
-            bucket,
-            count: 0,
-        });
+        let entry = self
+            .counters
+            .entry(key.to_string())
+            .or_insert(Counter { bucket, count: 0 });
         if entry.bucket != bucket {
             entry.bucket = bucket;
             entry.count = 0;
@@ -175,7 +175,10 @@ mod tests {
             rl.enforce("w", &RULE, 0).unwrap();
         }
         let err = rl.enforce("w", &RULE, 0).unwrap_err();
-        assert!(matches!(err, ProtocolError::RateLimited { axis: "wallet", .. }));
+        assert!(matches!(
+            err,
+            ProtocolError::RateLimited { axis: "wallet", .. }
+        ));
     }
 
     #[test]

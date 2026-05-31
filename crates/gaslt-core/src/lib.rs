@@ -69,5 +69,5 @@ pub mod prelude {
     pub use crate::matching::{MatchCriteria, Matcher};
     pub use crate::rate::{RateDecision, RateLimiter, RateRule};
     pub use crate::registry::Registry;
-    pub use crate::types::{Pubkey, Sospeso, SospesoParams, SospesoId};
+    pub use crate::types::{Pubkey, Sospeso, SospesoId, SospesoParams};
 }
