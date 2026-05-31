@@ -82,7 +82,10 @@ gaslt/
 ├── programs/
 │   └── sospeso-verifier/      On-chain Anchor program
 ├── sdk/                       TypeScript client (@gaslt/sdk)
-├── java/                      Java client (fun.gaslt:gaslt-java)
+├── java/                      JVM toolkit (Maven multi-module)
+│   ├── core/                  Java SDK (fun.gaslt:gaslt-java)
+│   ├── cli/                   gaslt command-line tool (reads mainnet)
+│   └── service/               HTTP service exposing pools/registry/bridges
 └── docs/                      Protocol and architecture notes
 ```
 
@@ -181,8 +184,10 @@ cargo fmt --all -- --check
 # TypeScript SDK
 cd sdk && npm ci && npm run build && npm test
 
-# Java client (JDK 17)
+# JVM toolkit: SDK + CLI + service (JDK 17)
 cd java && mvn -B verify
+java -jar cli/target/gaslt-cli.jar program        # read the live program
+java -jar service/target/gaslt-service.jar        # serve pools/registry/bridges
 
 # On-chain program (Solana toolchain)
 anchor build

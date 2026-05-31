@@ -21,5 +21,9 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: maven
-      - name: compile and test
+      - name: compile, test, and build jars
         run: mvn -B -ntp verify
+      - name: cli smoke test
+        run: java -jar cli/target/gaslt-cli.jar --help
+      - name: cli derives a pda offline
+        run: java -jar cli/target/gaslt-cli.jar pda --sponsor So11111111111111111111111111111111111111112 --nonce 7
