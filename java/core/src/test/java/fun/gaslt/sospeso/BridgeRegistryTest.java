@@ -66,6 +66,21 @@ class BridgeRegistryTest {
     }
 
     @Test
+    void bridgePdaMatchesLiveOnChainAddress() {
+        // The live mainnet bridge: ["bridge", <live authority>] derived in code must
+        // equal the address (and bump) verified directly on chain. The address is
+        // never hard-coded into the SDK; this test only pins the derivation.
+        PublicKey liveAuthority =
+                new PublicKey("9prpwEhLBsN2V9JmGbryyxmsT87d2Hqc4UhqQG8zWtum");
+        PublicKey expected =
+                new PublicKey("B4smUxyDeW6ptTS6Sd5GsnRD2Pxm2acps5Fqo6HTmEsj");
+
+        PublicKey.ProgramDerivedAddress pda = Pda.bridge(liveAuthority);
+        assertEquals(expected, pda.getAddress());
+        assertEquals(255, pda.getNonce());
+    }
+
+    @Test
     void decodesBridge() {
         byte[] data = new BorshWriter()
                 .bytes(SospesoProgram.accountDiscriminator("Bridge"))
