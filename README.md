@@ -215,7 +215,7 @@ The full rule set, including the anti-abuse layers, is described in
 ## Links
 
 - Site: https://gaslt.fun
-- Docs: [protocol](./docs/protocol.md) and [architecture](./docs/architecture.md)
+- Docs: [protocol](./docs/protocol.md), [architecture](./docs/architecture.md), and the [JVM bridge](./docs/jvm-bridge.md)
 - X: https://x.com/gasltbar
 
 ## License
