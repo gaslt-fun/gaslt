@@ -19,7 +19,7 @@ pub mod state;
 use crate::errors::SospesoError;
 use crate::state::{ClaimReceipt, Sospeso};
 
-declare_id!("CKepu1fT4aCkDrsWLv499WCVMb5KKVfG5a1znjC5yuYA");
+declare_id!("44gAuvd36LqRNNMqDMCvmoJFNm3eoEGGyaHWeyBeQMPW");
 
 #[program]
 pub mod sospeso_verifier {
