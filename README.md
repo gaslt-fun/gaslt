@@ -23,6 +23,7 @@
   <a href="https://github.com/gaslt-fun/gaslt/stargazers"><img src="https://img.shields.io/github/stars/gaslt-fun/gaslt?style=flat-square&color=FFC72C" alt="Stars" /></a>
   <img src="https://img.shields.io/badge/rust-1.75%2B-B8860B?style=flat-square&logo=rust" alt="Rust" />
   <img src="https://img.shields.io/badge/typescript-5.5-3A5FAE?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/java-17-C8322F?style=flat-square&logo=openjdk&logoColor=white" alt="Java" />
   <img src="https://img.shields.io/badge/solana-anchor%200.30-3D2817?style=flat-square&logo=solana" alt="Solana" />
 </p>
 
@@ -81,6 +82,7 @@ gaslt/
 ├── programs/
 │   └── sospeso-verifier/      On-chain Anchor program
 ├── sdk/                       TypeScript client (@gaslt/sdk)
+├── java/                      Java client (fun.gaslt:gaslt-java)
 └── docs/                      Protocol and architecture notes
 ```
 
@@ -178,6 +180,9 @@ cargo fmt --all -- --check
 
 # TypeScript SDK
 cd sdk && npm ci && npm run build && npm test
+
+# Java client (JDK 17)
+cd java && mvn -B verify
 
 # On-chain program (Solana toolchain)
 anchor build
