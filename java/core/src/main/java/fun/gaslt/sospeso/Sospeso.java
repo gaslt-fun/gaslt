@@ -7,50 +7,51 @@ import org.p2p.solanaj.core.PublicKey;
 
 /**
  * A decoded on-chain {@code Sospeso} pool account, mirroring the field layout of
- * the Rust {@code state::Sospeso} struct. The convenience predicates
- * ({@link #isExpired}, {@link #claimsExhausted}, {@link #canCover}) and
- * {@link #utilizationBps} match the {@code gaslt-core} behaviour so off-chain
- * callers reason about a pool exactly as the program does.
+ * the Rust {@code state::Sospeso} struct exactly as published in the program IDL.
+ * The convenience predicates ({@link #isExpired}, {@link #claimsExhausted},
+ * {@link #canCover}) and {@link #utilizationBps} match the {@code gaslt-core}
+ * behaviour so off-chain callers reason about a pool exactly as the program does.
+ *
+ * <p>On-chain byte layout (after the 8-byte account discriminator):
+ * {@code sponsor(32) lamports_total(8) lamports_remaining(8) max_per_claim(8)
+ * claims_count(4) max_claims(4) expiry_ts(8) new_wallet_only(1) nonce(8) bump(1)}.
  */
 public final class Sospeso {
 
-    /** Expected total account size in bytes: 8-byte discriminator + 120-byte body. */
-    public static final int ACCOUNT_SIZE = 128;
+    /** Expected total account size in bytes: 8-byte discriminator + 82-byte body. */
+    public static final int ACCOUNT_SIZE = 90;
 
     private final PublicKey sponsor;
-    private final PublicKey program;
     private final long lamportsTotal;
     private final long lamportsRemaining;
     private final long maxPerClaim;
     private final long claimsCount;
     private final long maxClaims;
     private final long expiryTs;
-    private final long nonce;
     private final boolean newWalletOnly;
+    private final long nonce;
     private final int bump;
 
     Sospeso(
             PublicKey sponsor,
-            PublicKey program,
             long lamportsTotal,
             long lamportsRemaining,
             long maxPerClaim,
             long claimsCount,
             long maxClaims,
             long expiryTs,
-            long nonce,
             boolean newWalletOnly,
+            long nonce,
             int bump) {
         this.sponsor = sponsor;
-        this.program = program;
         this.lamportsTotal = lamportsTotal;
         this.lamportsRemaining = lamportsRemaining;
         this.maxPerClaim = maxPerClaim;
         this.claimsCount = claimsCount;
         this.maxClaims = maxClaims;
         this.expiryTs = expiryTs;
-        this.nonce = nonce;
         this.newWalletOnly = newWalletOnly;
+        this.nonce = nonce;
         this.bump = bump;
     }
 
@@ -72,19 +73,18 @@ public final class Sospeso {
         }
         BorshReader r = new BorshReader(accountData).skip(8);
         PublicKey sponsor = r.pubkey();
-        PublicKey program = r.pubkey();
         long lamportsTotal = r.u64();
         long lamportsRemaining = r.u64();
         long maxPerClaim = r.u64();
         long claimsCount = r.u32();
         long maxClaims = r.u32();
         long expiryTs = r.i64();
-        long nonce = r.u64();
         boolean newWalletOnly = r.bool();
+        long nonce = r.u64();
         int bump = r.u8();
         return new Sospeso(
-                sponsor, program, lamportsTotal, lamportsRemaining, maxPerClaim,
-                claimsCount, maxClaims, expiryTs, nonce, newWalletOnly, bump);
+                sponsor, lamportsTotal, lamportsRemaining, maxPerClaim,
+                claimsCount, maxClaims, expiryTs, newWalletOnly, nonce, bump);
     }
 
     /** Whether the pool has expired at {@code now} (expiry 0 means never). */
@@ -124,10 +124,6 @@ public final class Sospeso {
         return sponsor;
     }
 
-    public PublicKey program() {
-        return program;
-    }
-
     public long lamportsTotal() {
         return lamportsTotal;
     }
@@ -152,12 +148,12 @@ public final class Sospeso {
         return expiryTs;
     }
 
-    public long nonce() {
-        return nonce;
-    }
-
     public boolean newWalletOnly() {
         return newWalletOnly;
+    }
+
+    public long nonce() {
+        return nonce;
     }
 
     public int bump() {

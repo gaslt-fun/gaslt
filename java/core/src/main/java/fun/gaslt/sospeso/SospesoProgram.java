@@ -9,7 +9,7 @@ import org.p2p.solanaj.core.PublicKey;
 
 /**
  * Program-level constants and Anchor discriminator helpers for the
- * {@code sospeso_verifier} program (mainnet, v0.1.2).
+ * {@code sospeso_verifier} program (mainnet, v0.1.3).
  *
  * <p>Anchor prefixes every instruction's data with an 8-byte discriminator equal
  * to the first eight bytes of {@code sha256("global:<instruction_name>")}, and

@@ -13,6 +13,9 @@ import org.p2p.solanaj.rpc.types.AccountInfo;
  * {@link RpcClient}, fetches account data over JSON-RPC, and decodes it into the
  * {@link Sospeso} and {@link ClaimReceipt} models.
  *
+ * <p>It also reads the v0.1.3 registry and bridge accounts ({@link BarRegistry},
+ * {@link RegistryEntry}, {@link Bridge}, {@link SospesoMeta}).
+ *
  * <p>This client is read-only: it derives PDAs and reads on-chain state. Building
  * and signing transactions is the caller's responsibility using
  * {@link SospesoInstructions}; that keeps key handling outside this library.
@@ -65,6 +68,29 @@ public final class SospesoClient {
      */
     public boolean hasClaimed(PublicKey pool, PublicKey beneficiary) throws RpcException {
         return fetchClaimReceipt(pool, beneficiary).isPresent();
+    }
+
+    /** Fetch and decode the singleton bar registry, if it has been initialised. */
+    public Optional<BarRegistry> fetchRegistry() throws RpcException {
+        return fetchAccountData(Pda.registry().getAddress()).map(BarRegistry::from);
+    }
+
+    /** Fetch and decode the registry entry recorded for {@code pool} ({@code ["regentry", pool]}), if any. */
+    public Optional<RegistryEntry> fetchRegistryEntry(PublicKey pool) throws RpcException {
+        return fetchAccountData(Pda.registryEntry(pool).getAddress()).map(RegistryEntry::from);
+    }
+
+    /**
+     * Fetch and decode the bridge registered by {@code authority}
+     * ({@code ["bridge", authority]}), if it exists.
+     */
+    public Optional<Bridge> fetchBridge(PublicKey authority) throws RpcException {
+        return fetchAccountData(Pda.bridge(authority).getAddress()).map(Bridge::from);
+    }
+
+    /** Fetch and decode the metadata for {@code pool} ({@code ["meta", pool]}), if a sponsor set any. */
+    public Optional<SospesoMeta> fetchMeta(PublicKey pool) throws RpcException {
+        return fetchAccountData(Pda.meta(pool).getAddress()).map(SospesoMeta::from);
     }
 
     private Optional<byte[]> fetchAccountData(PublicKey account) throws RpcException {

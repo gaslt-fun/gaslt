@@ -12,6 +12,8 @@ import org.p2p.solanaj.core.PublicKey;
  * <ul>
  *   <li>Pool: {@code ["sospeso", sponsor, nonce_le(8)]}</li>
  *   <li>Claim receipt: {@code ["claim", sospeso, beneficiary]}</li>
+ *   <li>Bar registry: {@code ["registry"]} (singleton)</li>
+ *   <li>Bridge: {@code ["bridge", authority]}</li>
  * </ul>
  *
  * <p>A {@code nonce} is encoded as a little-endian {@code u64}, matching
@@ -24,6 +26,18 @@ public final class Pda {
 
     /** Seed prefix for the claim receipt PDA (matches {@code ClaimReceipt::SEED}). */
     public static final byte[] CLAIM_SEED = "claim".getBytes(StandardCharsets.UTF_8);
+
+    /** Seed prefix for the singleton bar registry PDA. */
+    public static final byte[] REGISTRY_SEED = "registry".getBytes(StandardCharsets.UTF_8);
+
+    /** Seed prefix for a bridge PDA. */
+    public static final byte[] BRIDGE_SEED = "bridge".getBytes(StandardCharsets.UTF_8);
+
+    /** Seed prefix for a registry entry PDA. */
+    public static final byte[] REGENTRY_SEED = "regentry".getBytes(StandardCharsets.UTF_8);
+
+    /** Seed prefix for a sospeso meta PDA. */
+    public static final byte[] META_SEED = "meta".getBytes(StandardCharsets.UTF_8);
 
     private Pda() {
     }
@@ -39,6 +53,33 @@ public final class Pda {
     public static PublicKey.ProgramDerivedAddress claimReceipt(PublicKey sospeso, PublicKey beneficiary) {
         return PublicKey.findProgramAddress(
                 List.of(CLAIM_SEED, sospeso.toByteArray(), beneficiary.toByteArray()),
+                SospesoProgram.PROGRAM_ID);
+    }
+
+    /** Derive the singleton bar registry PDA ({@code ["registry"]}). */
+    public static PublicKey.ProgramDerivedAddress registry() {
+        return PublicKey.findProgramAddress(
+                List.of(REGISTRY_SEED), SospesoProgram.PROGRAM_ID);
+    }
+
+    /** Derive the bridge PDA for {@code authority} ({@code ["bridge", authority]}). */
+    public static PublicKey.ProgramDerivedAddress bridge(PublicKey authority) {
+        return PublicKey.findProgramAddress(
+                List.of(BRIDGE_SEED, authority.toByteArray()),
+                SospesoProgram.PROGRAM_ID);
+    }
+
+    /** Derive the registry entry PDA for {@code pool} ({@code ["regentry", sospeso]}). */
+    public static PublicKey.ProgramDerivedAddress registryEntry(PublicKey pool) {
+        return PublicKey.findProgramAddress(
+                List.of(REGENTRY_SEED, pool.toByteArray()),
+                SospesoProgram.PROGRAM_ID);
+    }
+
+    /** Derive the meta PDA for {@code pool} ({@code ["meta", sospeso]}). */
+    public static PublicKey.ProgramDerivedAddress meta(PublicKey pool) {
+        return PublicKey.findProgramAddress(
+                List.of(META_SEED, pool.toByteArray()),
                 SospesoProgram.PROGRAM_ID);
     }
 

@@ -12,12 +12,14 @@ class AccountDecodeTest {
 
     private static final PublicKey SPONSOR =
             new PublicKey("So11111111111111111111111111111111111111112");
-    private static final PublicKey PROGRAM =
-            new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
     private static final PublicKey BENEFICIARY =
             new PublicKey("ComputeBudget111111111111111111111111111111");
 
-    /** Build a Sospeso account buffer exactly as the on-chain layout serialises it. */
+    /**
+     * Build a Sospeso account buffer exactly as the on-chain layout serialises it
+     * (the v0.1.3 layout published in the IDL: no target-program field, with
+     * {@code new_wallet_only} preceding {@code nonce}).
+     */
     private static byte[] encodeSospeso(
             long lamportsTotal,
             long lamportsRemaining,
@@ -31,17 +33,15 @@ class AccountDecodeTest {
         return new BorshWriter()
                 .bytes(SospesoProgram.accountDiscriminator("Sospeso"))
                 .pubkey(SPONSOR)
-                .pubkey(PROGRAM)
                 .u64(lamportsTotal)
                 .u64(lamportsRemaining)
                 .u64(maxPerClaim)
                 .u32(claimsCount)
                 .u32(maxClaims)
                 .i64(expiryTs)
-                .u64(nonce)
                 .bool(newWalletOnly)
+                .u64(nonce)
                 .u8(bump)
-                .bytes(new byte[6]) // _padding
                 .toByteArray();
     }
 
@@ -50,10 +50,10 @@ class AccountDecodeTest {
         byte[] data = encodeSospeso(
                 1_000_000_000L, 750_000_000L, 5_000_000L, 3, 10, 1_900_000_000L, 42, true, 254);
         assertEquals(Sospeso.ACCOUNT_SIZE, data.length);
+        assertEquals(90, data.length);
 
         Sospeso pool = Sospeso.from(data);
         assertEquals(SPONSOR, pool.sponsor());
-        assertEquals(PROGRAM, pool.program());
         assertEquals(1_000_000_000L, pool.lamportsTotal());
         assertEquals(750_000_000L, pool.lamportsRemaining());
         assertEquals(5_000_000L, pool.maxPerClaim());

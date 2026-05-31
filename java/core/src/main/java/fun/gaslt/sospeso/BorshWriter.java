@@ -1,13 +1,15 @@
 package fun.gaslt.sospeso;
 
 import java.io.ByteArrayOutputStream;
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 import org.p2p.solanaj.core.PublicKey;
 
 /**
- * A minimal little-endian Borsh encoder covering the scalar types used by the
- * sospeso program's instruction arguments: {@code u8}, {@code bool}, {@code u32},
- * {@code u64}, {@code i64}, and 32-byte public keys.
+ * A minimal little-endian Borsh encoder covering the types used by the sospeso
+ * program: {@code u8}, {@code bool}, {@code u32}, {@code u64}, {@code i64},
+ * {@code u128}, length-prefixed strings, and 32-byte public keys.
  *
  * <p>Borsh encodes integers in little-endian with no length prefix, which is what
  * Anchor expects after the 8-byte instruction discriminator.
@@ -49,6 +51,25 @@ public final class BorshWriter {
         return u64(value);
     }
 
+    /** Append a little-endian unsigned 128-bit integer. */
+    public BorshWriter u128(BigInteger value) {
+        if (value.signum() < 0 || value.bitLength() > 128) {
+            throw new IllegalArgumentException("u128 out of range: " + value);
+        }
+        for (int i = 0; i < 16; i++) {
+            out.write(value.shiftRight(8 * i).and(BigInteger.valueOf(0xff)).intValue());
+        }
+        return this;
+    }
+
+    /** Append a Borsh string: a little-endian {@code u32} byte length then UTF-8 bytes. */
+    public BorshWriter string(String value) {
+        byte[] utf8 = value.getBytes(StandardCharsets.UTF_8);
+        u32(utf8.length);
+        out.writeBytes(utf8);
+        return this;
+    }
+
     /** Append a 32-byte public key in its raw on-chain byte order. */
     public BorshWriter pubkey(PublicKey key) {
         byte[] bytes = key.toByteArray();
@@ -62,6 +83,22 @@ public final class BorshWriter {
     /** Append raw bytes verbatim (used for the instruction discriminator). */
     public BorshWriter bytes(byte[] raw) {
         out.writeBytes(raw);
+        return this;
+    }
+
+    /**
+     * Append a fixed-size {@code [u8; length]} field, NUL-padding (or truncating)
+     * {@code value} to exactly {@code length} bytes. Borsh encodes a fixed-size
+     * byte array as the raw bytes with no length prefix, matching the program's
+     * ascii null-padded fields ({@code kind}, {@code endpoint}, {@code label}).
+     */
+    public BorshWriter fixedBytes(byte[] value, int length) {
+        if (length < 0) {
+            throw new IllegalArgumentException("length must be non-negative: " + length);
+        }
+        byte[] fixed = new byte[length];
+        System.arraycopy(value, 0, fixed, 0, Math.min(value.length, length));
+        out.writeBytes(fixed);
         return this;
     }
 

@@ -1,5 +1,7 @@
 package fun.gaslt.sospeso;
 
+import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 import org.p2p.solanaj.core.PublicKey;
@@ -61,6 +63,48 @@ public final class BorshReader {
     /** Read a little-endian signed 64-bit integer. */
     public long i64() {
         return u64();
+    }
+
+    /** Read a little-endian unsigned 128-bit integer as a non-negative BigInteger. */
+    public BigInteger u128() {
+        require(16);
+        byte[] le = Arrays.copyOfRange(data, pos, pos + 16);
+        pos += 16;
+        // BigInteger is big-endian and signed; reverse the bytes and prepend a
+        // zero sign byte so the value is always interpreted as unsigned.
+        byte[] be = new byte[17];
+        for (int i = 0; i < 16; i++) {
+            be[1 + i] = le[15 - i];
+        }
+        return new BigInteger(be);
+    }
+
+    /**
+     * Read a Borsh string: a little-endian {@code u32} byte length followed by
+     * that many UTF-8 bytes.
+     */
+    public String string() {
+        int len = (int) u32();
+        require(len);
+        String s = new String(data, pos, len, StandardCharsets.UTF_8);
+        pos += len;
+        return s;
+    }
+
+    /**
+     * Read a fixed-size {@code [u8; n]} ascii field and trim it at the first NUL,
+     * the convention the program uses for null-padded fixed strings.
+     */
+    public String fixedAscii(int n) {
+        require(n);
+        int end = pos;
+        int limit = pos + n;
+        while (end < limit && data[end] != 0) {
+            end++;
+        }
+        String s = new String(data, pos, end - pos, StandardCharsets.US_ASCII);
+        pos += n;
+        return s;
     }
 
     /** Read a 32-byte public key. */
