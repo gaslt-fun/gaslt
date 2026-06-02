@@ -14,6 +14,7 @@ import org.p2p.solanaj.core.PublicKey;
  *   <li>Claim receipt: {@code ["claim", sospeso, beneficiary]}</li>
  *   <li>Bar registry: {@code ["registry"]} (singleton)</li>
  *   <li>Bridge: {@code ["bridge", authority]}</li>
+ *   <li>Bridge pulse: {@code ["pulse", bridge]}</li>
  * </ul>
  *
  * <p>A {@code nonce} is encoded as a little-endian {@code u64}, matching
@@ -38,6 +39,9 @@ public final class Pda {
 
     /** Seed prefix for a sospeso meta PDA. */
     public static final byte[] META_SEED = "meta".getBytes(StandardCharsets.UTF_8);
+
+    /** Seed prefix for a bridge pulse PDA. */
+    public static final byte[] PULSE_SEED = "pulse".getBytes(StandardCharsets.UTF_8);
 
     private Pda() {
     }
@@ -80,6 +84,13 @@ public final class Pda {
     public static PublicKey.ProgramDerivedAddress meta(PublicKey pool) {
         return PublicKey.findProgramAddress(
                 List.of(META_SEED, pool.toByteArray()),
+                SospesoProgram.PROGRAM_ID);
+    }
+
+    /** Derive the bridge pulse PDA for {@code bridge} ({@code ["pulse", bridge]}). */
+    public static PublicKey.ProgramDerivedAddress bridgePulse(PublicKey bridge) {
+        return PublicKey.findProgramAddress(
+                List.of(PULSE_SEED, bridge.toByteArray()),
                 SospesoProgram.PROGRAM_ID);
     }
 

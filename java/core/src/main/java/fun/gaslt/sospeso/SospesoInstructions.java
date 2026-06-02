@@ -13,13 +13,14 @@ import org.p2p.solanaj.core.TransactionInstruction;
  * followed by the Borsh-serialised arguments, and lists the account metas in the
  * exact order the program's {@code #[derive(Accounts)]} structs declare them.
  *
- * <p>The program exposes fifteen instructions:
+ * <p>The program exposes sixteen instructions:
  * <ul>
  *   <li>Escrow core: {@code create_sospeso}, {@code claim_sospeso}, {@code top_up}, {@code reclaim}.</li>
  *   <li>Metadata: {@code set_meta}, {@code update_meta}, {@code clear_meta}.</li>
  *   <li>Expiry: {@code extend_expiry}.</li>
  *   <li>Registry: {@code init_registry}, {@code register_pool}, {@code sync_pool_stats}, {@code emit_version}.</li>
  *   <li>Bridge: {@code register_bridge}, {@code update_bridge}, {@code revoke_bridge}.</li>
+ *   <li>Bridge pulse: {@code bridge_pulse}.</li>
  * </ul>
  */
 public final class SospesoInstructions {
@@ -395,6 +396,40 @@ public final class SospesoInstructions {
         List<AccountMeta> keys = List.of(
                 new AccountMeta(authority, true, true),
                 new AccountMeta(bridge, false, true));
+
+        return new TransactionInstruction(SospesoProgram.PROGRAM_ID, keys, data);
+    }
+
+    // ------------------------------------------------------------------
+    // Bridge pulse
+    // ------------------------------------------------------------------
+
+    /**
+     * Stamp the bridge's on-chain pulse, recording a fresh liveness timestamp,
+     * folding {@code relayedDelta} into the cumulative relayed-claims counter, and
+     * reporting the service {@code version}. The {@code ["pulse", bridge]} PDA is
+     * created on the first call (the program uses {@code init_if_needed}) and
+     * updated thereafter. Only the bridge authority may call this.
+     *
+     * <p>Accounts (in order): authority (signer, writable), bridge PDA (readonly),
+     * pulse PDA (writable), system program (readonly).
+     */
+    public static TransactionInstruction bridgePulse(
+            PublicKey authority, long relayedDelta, long version) {
+        PublicKey bridge = Pda.bridge(authority).getAddress();
+        PublicKey pulse = Pda.bridgePulse(bridge).getAddress();
+
+        byte[] data = new BorshWriter()
+                .bytes(SospesoProgram.instructionDiscriminator("bridge_pulse"))
+                .u64(relayedDelta)
+                .u32(version)
+                .toByteArray();
+
+        List<AccountMeta> keys = List.of(
+                new AccountMeta(authority, true, true),
+                new AccountMeta(bridge, false, false),
+                new AccountMeta(pulse, false, true),
+                new AccountMeta(SospesoProgram.SYSTEM_PROGRAM_ID, false, false));
 
         return new TransactionInstruction(SospesoProgram.PROGRAM_ID, keys, data);
     }

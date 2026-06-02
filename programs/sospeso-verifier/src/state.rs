@@ -248,6 +248,39 @@ impl Bridge {
         32 + BRIDGE_KIND_LEN + BRIDGE_ENDPOINT_LEN + BRIDGE_LABEL_LEN + 1 + 8 + 8 + 1;
 }
 
+// ---------------------------------------------------------------------------
+// v0.1.4 addition -- the on-chain bridge pulse. A `BridgePulse` account is a
+// liveness + work oracle for a registered `Bridge`: the bridge's off-chain
+// service stamps it so anyone can verify, from the chain alone, that the
+// bridge is operating and how much work it has settled. Additive: it does not
+// change the byte layout of any account above, so every existing account keeps
+// deserializing unchanged (full backward compatibility).
+// ---------------------------------------------------------------------------
+
+/// On-chain liveness + work oracle for a registered Bridge. The bridge's
+/// off-chain service (e.g. the JVM relayer) stamps this so anyone can verify,
+/// from the chain alone, that the bridge is operating and how much it settled.
+///
+/// PDA: seeds `[b"pulse", bridge]` -- one pulse per bridge. Created on the first
+/// `bridge_pulse` call and updated on every subsequent call. Only the bridge
+/// `authority` may write (enforced via `has_one` on the bridge).
+#[account]
+pub struct BridgePulse {
+    pub bridge: Pubkey,
+    pub authority: Pubkey,
+    pub last_ts: i64,
+    pub pulse_count: u64,
+    pub relayed_claims: u64,
+    pub version: u32,
+    pub bump: u8,
+}
+
+impl BridgePulse {
+    /// Serialized length excluding the 8-byte discriminator.
+    /// 32 + 32 + 8 + 8 + 8 + 4 + 1 = 93
+    pub const LEN: usize = 32 + 32 + 8 + 8 + 8 + 4 + 1;
+}
+
 impl Sospeso {
     /// Lamports already paid out across all honoured claims.
     #[inline]

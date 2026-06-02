@@ -108,3 +108,17 @@ pub struct BridgeRevoked {
     pub authority: Pubkey,
     pub ts: i64,
 }
+
+// --- v0.1.4: bridge pulse event ---
+
+/// Emitted on every `bridge_pulse`; lets indexers track bridge liveness and
+/// cumulative relayed work without an account read.
+#[event]
+pub struct BridgePulsed {
+    pub bridge: Pubkey,
+    pub authority: Pubkey,
+    pub pulse_count: u64,
+    pub relayed_claims: u64,
+    pub version: u32,
+    pub ts: i64,
+}

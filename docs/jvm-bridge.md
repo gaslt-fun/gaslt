@@ -76,6 +76,80 @@ The instructions are additive: they neither read nor write any pool, receipt,
 meta, or registry account, so every account created by earlier program versions
 keeps deserializing unchanged.
 
+## Bridge pulse — on-chain liveness oracle
+
+A `Bridge` says *where* the off-chain service lives, but it cannot, on its own,
+tell you whether that service is still running. The `bridge_pulse` instruction
+closes that gap: it lets the bridge authority stamp a small heartbeat account so
+that *liveness and cumulative work become readable from the chain alone*, with no
+need to trust the service's own `/health` response.
+
+Each pulse does three things in one transaction: records the current block
+timestamp, folds a `relayed_delta` into a running total of claims the bridge has
+relayed, and writes back the service's reported `version`. The first call creates
+the account; every later call updates it in place. Only the bridge `authority`
+may write it — the program enforces this with a `has_one = authority` constraint
+against the bridge, so a pulse is cryptographic proof that the same key behind the
+registered bridge is the one reporting the heartbeat.
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{'primaryColor':'#FFD93D','primaryTextColor':'#3D2817','primaryBorderColor':'#B8860B','lineColor':'#C8322F','secondaryColor':'#F0EAD6','tertiaryColor':'#F0EAD6','fontFamily':'Inter, sans-serif'}}}%%
+flowchart LR
+  subgraph offchain["Off-chain (java/, Railway)"]
+    Service["gaslt-java service<br/>relays claims, tracks work"]
+  end
+  subgraph onchain["On-chain (Solana mainnet)"]
+    Ix["bridge_pulse<br/>relayed_delta, version"]
+    Bridge[(Bridge PDA<br/>seeds &quot;bridge&quot;, authority)]
+    Pulse[(BridgePulse PDA<br/>seeds &quot;pulse&quot;, bridge)]
+    Ix -->|has_one authority| Bridge
+    Ix -->|stamps last_ts, ++pulse_count,<br/>+= relayed_delta, version| Pulse
+  end
+  subgraph consumers["Anyone"]
+    Reader["Explorer / curl / SDK"]
+  end
+  Service -->|signs as bridge authority,<br/>on a schedule| Ix
+  Pulse -.->|getAccountInfo: read last_ts,<br/>pulse_count, relayed_claims| Reader
+  Pulse -.->|BridgePulsed event| Reader
+```
+
+### The `BridgePulse` account
+
+A `BridgePulse` is a PDA at seeds `["pulse", bridge]` — one per bridge. Its
+fields are all fixed-width, so the 101-byte account decodes by offset just like
+the bridge it tracks.
+
+| Offset | Size | Field | Type | Notes |
+|-------:|-----:|-------|------|-------|
+| 0 | 8 | discriminator | `[u8; 8]` | `sha256("account:BridgePulse")[..8]` = `b3c4355582814ed3` |
+| 8 | 32 | `bridge` | `Pubkey` | The bridge this pulse belongs to. |
+| 40 | 32 | `authority` | `Pubkey` | The bridge authority that stamps it. |
+| 72 | 8 | `last_ts` | `i64` | Unix timestamp of the most recent pulse, little-endian. |
+| 80 | 8 | `pulse_count` | `u64` | Total pulses recorded since creation. |
+| 88 | 8 | `relayed_claims` | `u64` | Cumulative claims the bridge reports relaying. |
+| 96 | 4 | `version` | `u32` | Service-reported version on the latest pulse. |
+| 100 | 1 | `bump` | `u8` | PDA bump. |
+| — | **101** | total | | 8 + 32 + 32 + 8 + 8 + 8 + 4 + 1. |
+
+Every successful pulse also emits a `BridgePulsed` event carrying the same
+counters, so an indexer can follow bridge liveness from the transaction log
+without an account read. Like the bridge instructions, `bridge_pulse` is purely
+additive — it only reads the existing `Bridge` (never mutates it) and writes its
+own dedicated account, so all earlier accounts keep deserializing unchanged.
+
+A consumer interprets the pulse the obvious way: compare `last_ts` against the
+current time to judge freshness, and read `relayed_claims` for how much work the
+bridge has settled. Because the value is on chain, the judgement needs no trust
+in the service that wrote it. From the Java core:
+
+```java
+SospesoClient client = new SospesoClient("https://api.mainnet-beta.solana.com");
+PublicKey bridge = Pda.bridge(authority).getAddress();
+client.fetchBridgePulse(bridge).ifPresent(p ->
+        System.out.printf("last pulse %d, %d pulses, %d relayed%n",
+                p.lastTs(), p.pulseCount(), p.relayedClaims()));
+```
+
 ## The live bridge
 
 The single registered bridge points the program at the `gaslt-java` service.
@@ -158,5 +232,3 @@ So `totalPools` is `0` and no sospeso pool has been created on chain yet —
 `GET /pool/{address}` will return `pool_not_found` for any address until a
 sponsor opens one. What is provably live today is the program, the initialised
 registry, and this JVM bridge.
-</content>
-</invoke>

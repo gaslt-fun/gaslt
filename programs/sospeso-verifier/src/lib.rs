@@ -18,12 +18,12 @@ pub mod validation;
 
 use errors::SospesoError;
 use events::{
-    BridgeRegistered, BridgeRevoked, BridgeUpdated, ExpiryExtended, MetaCleared, MetaSet,
-    MetaUpdated, PoolRegistered, PoolStatsSynced, RegistryInitialized, VersionEmitted,
+    BridgePulsed, BridgeRegistered, BridgeRevoked, BridgeUpdated, ExpiryExtended, MetaCleared,
+    MetaSet, MetaUpdated, PoolRegistered, PoolStatsSynced, RegistryInitialized, VersionEmitted,
 };
 use state::{
-    BarRegistry, Bridge, ClaimReceipt, RegistryEntry, Sospeso, SospesoMeta, BRIDGE_ENDPOINT_LEN,
-    BRIDGE_KIND_LEN, BRIDGE_LABEL_LEN,
+    BarRegistry, Bridge, BridgePulse, ClaimReceipt, RegistryEntry, Sospeso, SospesoMeta,
+    BRIDGE_ENDPOINT_LEN, BRIDGE_KIND_LEN, BRIDGE_LABEL_LEN,
 };
 use validation::{validate_extension, validate_future_ts, validate_meta};
 
@@ -538,6 +538,43 @@ pub mod sospeso_verifier {
         });
         Ok(())
     }
+
+    // =====================================================================
+    // v0.1.4 instruction -- the on-chain bridge pulse. Additive: it only
+    // reads the existing `Bridge` account (never mutates it) and writes a new
+    // dedicated `BridgePulse` PDA, so every prior instruction and account
+    // layout is untouched.
+    // =====================================================================
+
+    /// Stamp the bridge's on-chain pulse: liveness timestamp, cumulative relayed
+    /// claims, and reported version. Creates the pulse account on first call.
+    /// Only the bridge `authority` may call (enforced via has_one on the bridge).
+    pub fn bridge_pulse(
+        ctx: Context<BridgePulseCtx>,
+        relayed_delta: u64,
+        version: u32,
+    ) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let pulse = &mut ctx.accounts.pulse;
+        if pulse.pulse_count == 0 {
+            pulse.bridge = ctx.accounts.bridge.key();
+            pulse.authority = ctx.accounts.authority.key();
+            pulse.bump = ctx.bumps.pulse;
+        }
+        pulse.last_ts = now;
+        pulse.pulse_count = pulse.pulse_count.saturating_add(1);
+        pulse.relayed_claims = pulse.relayed_claims.saturating_add(relayed_delta);
+        pulse.version = version;
+        emit!(BridgePulsed {
+            bridge: pulse.bridge,
+            authority: pulse.authority,
+            pulse_count: pulse.pulse_count,
+            relayed_claims: pulse.relayed_claims,
+            version,
+            ts: now,
+        });
+        Ok(())
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -838,6 +875,34 @@ pub struct RevokeBridge<'info> {
         has_one = authority @ SospesoError::Unauthorized,
     )]
     pub bridge: Box<Account<'info, Bridge>>,
+}
+
+// -------------------------------------------------------------------------
+// v0.1.4 account context -- bridge pulse
+// -------------------------------------------------------------------------
+
+#[derive(Accounts)]
+pub struct BridgePulseCtx<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        has_one = authority @ SospesoError::Unauthorized,
+        seeds = [b"bridge", authority.key().as_ref()],
+        bump = bridge.bump,
+    )]
+    pub bridge: Box<Account<'info, Bridge>>,
+
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = 8 + BridgePulse::LEN,
+        seeds = [b"pulse", bridge.key().as_ref()],
+        bump,
+    )]
+    pub pulse: Box<Account<'info, BridgePulse>>,
+
+    pub system_program: Program<'info, System>,
 }
 
 // -------------------------------------------------------------------------

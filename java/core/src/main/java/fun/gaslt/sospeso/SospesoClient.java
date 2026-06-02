@@ -88,6 +88,15 @@ public final class SospesoClient {
         return fetchAccountData(Pda.bridge(authority).getAddress()).map(Bridge::from);
     }
 
+    /**
+     * Fetch and decode the liveness pulse for {@code bridge} ({@code ["pulse", bridge]}),
+     * if the bridge has pulsed at least once. Its {@code lastTs} and counters report
+     * how recently, and how much, the off-chain service has been working.
+     */
+    public Optional<BridgePulse> fetchBridgePulse(PublicKey bridge) throws RpcException {
+        return fetchAccountData(Pda.bridgePulse(bridge).getAddress()).map(BridgePulse::from);
+    }
+
     /** Fetch and decode the metadata for {@code pool} ({@code ["meta", pool]}), if a sponsor set any. */
     public Optional<SospesoMeta> fetchMeta(PublicKey pool) throws RpcException {
         return fetchAccountData(Pda.meta(pool).getAddress()).map(SospesoMeta::from);
